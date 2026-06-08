@@ -1,0 +1,17 @@
+# Entornos virtuales de Python
+test_venv/
+venv/
+.venv/
+env/
+
+# Caché de compilación de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Directorios de configuración de prueba locales
+bind_config/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db

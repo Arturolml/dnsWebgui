@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIND9 DNS WebGUI</title>
+    <!-- Google Fonts: Outfit & Fira Code for code editor -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <span>BIND9 WebGUI</span>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="nav-item active" data-view="dashboard">
+                    <svg viewBox="0 0 24 24" class="nav-icon"><rect x="3" y="3" width="7" height="9" rx="1"></rect><rect x="14" y="3" width="7" height="5" rx="1"></rect><rect x="14" y="12" width="7" height="9" rx="1"></rect><rect x="3" y="16" width="7" height="5" rx="1"></rect></svg>
+                    Panel de Control
+                </a>
+                <a href="#zones" class="nav-item" data-view="zones">
+                    <svg viewBox="0 0 24 24" class="nav-icon"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                    Zonas DNS
+                </a>
+                <a href="#options" class="nav-item" data-view="options">
+                    <svg viewBox="0 0 24 24" class="nav-icon"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    Opciones Globales
+                </a>
+                <a href="#editor" class="nav-item" data-view="editor">
+                    <svg viewBox="0 0 24 24" class="nav-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    Editor de Archivos
+                </a>
+                <a href="#diagnostics" class="nav-item" data-view="diagnostics">
+                    <svg viewBox="0 0 24 24" class="nav-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    Diagnósticos
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <span class="mode-badge test" id="appModeBadge">MODO PRUEBA</span>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Header -->
+            <header class="main-header">
+                <div class="header-info">
+                    <h1>Panel de Control</h1>
+                    <span id="configPathText" class="config-path">Ruta: ./bind_config</span>
+                </div>
+                <div class="header-status">
+                    <span class="status-indicator offline" id="serviceIndicator">
+                        <span class="indicator-dot"></span>
+                        <span class="indicator-text">Comprobando...</span>
+                    </span>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <!-- Notifications Area -->
+                <div id="alertContainer" class="alert-container"></div>
+
+                <!-- VIEW: Dashboard -->
+                <section id="view-dashboard" class="content-view active">
+                    <!-- Metrics Cards Grid -->
+                    <div class="metrics-grid">
+                        <div class="metric-card glow-blue">
+                            <div class="metric-header">
+                                <h3>Estado del DNS</h3>
+                                <svg viewBox="0 0 24 24" class="metric-icon color-blue"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            </div>
+                            <div class="metric-value" id="dashSvcStatus">-</div>
+                            <div class="metric-footer" id="dashSvcMsg">Comprobando servicio...</div>
+                        </div>
+
+                        <div class="metric-card glow-cyan">
+                            <div class="metric-header">
+                                <h3>Zonas DNS</h3>
+                                <svg viewBox="0 0 24 24" class="metric-icon color-cyan"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                            </div>
+                            <div class="metric-value" id="dashZoneCount">0</div>
+                            <div class="metric-footer">
+                                <span id="dashFwdZones">0 Directas</span> &bull; <span id="dashRevZones">0 Inversas</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card glow-purple">
+                            <div class="metric-header">
+                                <h3>Memoria RAM</h3>
+                                <svg viewBox="0 0 24 24" class="metric-icon color-purple"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                            </div>
+                            <div class="metric-value-container">
+                                <div class="metric-value" id="dashRamPct">0%</div>
+                                <div class="progress-ring-mini">
+                                    <div class="progress-bar" id="dashRamBar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="metric-footer" id="dashRamUsage">0 MB / 0 MB</div>
+                        </div>
+
+                        <div class="metric-card glow-green">
+                            <div class="metric-header">
+                                <h3>Carga CPU</h3>
+                                <svg viewBox="0 0 24 24" class="metric-icon color-green"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg>
+                            </div>
+                            <div class="metric-value" id="dashCpuLoad">0.0</div>
+                            <div class="metric-footer" id="dashCpuCores">Cores: -</div>
+                        </div>
+                    </div>
+
+                    <!-- Operations & System Info -->
+                    <div class="dashboard-details">
+                        <!-- Quick Actions -->
+                        <div class="details-card">
+                            <div class="card-title">Acciones del Servicio DNS</div>
+                            <div class="actions-grid">
+                                <button class="btn btn-success" id="btnStartSvc">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                    Iniciar
+                                </button>
+                                <button class="btn btn-danger" id="btnStopSvc">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                                    Detener
+                                </button>
+                                <button class="btn btn-warning" id="btnRestartSvc">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                    Reiniciar
+                                </button>
+                                <button class="btn btn-info" id="btnReloadSvc">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                    Recargar Config
+                                </button>
+                            </div>
+                            <div class="card-instruction" id="permissionTip">
+                                <div class="tip-icon">💡</div>
+                                <div class="tip-text">La WebGUI se ejecuta como un servicio del sistema con permisos necesarios para controlar y reiniciar el servicio BIND9 en tiempo real.</div>
+                            </div>
+                        </div>
+
+                        <!-- System Information -->
+                        <div class="details-card">
+                            <div class="card-title">Información del Servidor</div>
+                            <table class="info-table">
+                                <tr>
+                                    <td>Modo de Operación:</td>
+                                    <td><span class="badge" id="infoModeBadge">-</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Ruta de Archivos BIND9:</td>
+                                    <td class="font-mono" id="infoConfigDir">-</td>
+                                </tr>
+                                <tr>
+                                    <td>Validación automática:</td>
+                                    <td><span class="badge badge-success">Activo (named-checkconf)</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Usuario WebGUI:</td>
+                                    <td id="infoSystemUser">dnsserverl</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW: Zones -->
+                <section id="view-zones" class="content-view">
+                    <div class="view-header">
+                        <h2>Zonas DNS Configuradas</h2>
+                        <button class="btn btn-primary" id="btnOpenAddZoneModal">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            Nueva Zona
+                        </button>
+                    </div>
+
+                    <div class="search-bar-container">
+                        <input type="text" id="zoneSearchInput" placeholder="Buscar zona por nombre o tipo...">
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table" id="zonesTable">
+                            <thead>
+                                <tr>
+                                    <th>Nombre de Zona</th>
+                                    <th>Tipo</th>
+                                    <th>Dirección / Inversa</th>
+                                    <th>Ruta de Base de Datos</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="zonesTableBody">
+                                <!-- Loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- VIEW: Zone Records Manager (Loaded when managing a zone) -->
+                <section id="view-records" class="content-view">
+                    <div class="records-header">
+                        <button class="btn btn-secondary btn-sm" id="btnBackToZones">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                            Volver a Zonas
+                        </button>
+                        <h2 id="recordsTitle">Gestionar Zona: example.com</h2>
+                        <span class="badge font-mono" id="recordsFilePath">db.example.com</span>
+                    </div>
+
+                    <!-- Zone Config & SOA Grid -->
+                    <div class="zone-soa-grid">
+                        <!-- Global parameters -->
+                        <div class="details-card">
+                            <div class="card-title">Parámetros Globales de la Zona</div>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="soaDefaultTtl">Default TTL (segundos)</label>
+                                    <input type="text" id="soaDefaultTtl" value="604800">
+                                </div>
+                                <div class="form-group">
+                                    <label for="soaName">Nombre (Apex / @)</label>
+                                    <input type="text" id="soaName" value="@" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SOA Record detail -->
+                        <div class="details-card">
+                            <div class="card-title">Registro SOA (Start of Authority)</div>
+                            <div class="form-grid-three">
+                                <div class="form-group">
+                                    <label for="soaMname">Servidor Primario (MName)</label>
+                                    <input type="text" id="soaMname">
+                                </div>
+                                <div class="form-group">
+                                    <label for="soaRname">Correo Administrador (RName)</label>
+                                    <input type="text" id="soaRname">
+                                </div>
+                                <div class="form-group">
+                                    <label for="soaSerial">Número de Serie (Serial)</label>
+                                    <input type="number" id="soaSerial" readonly>
+                                </div>
+                                <div class="form-group">
+                                    <label for="soaRefresh">Frecuencia de Refresco (Refresh)</label>
+                                    <input type="number" id="soaRefresh">
+                                </div>
+                                <div class="form-group">
+                                    <label for="soaRetry">Tiempo de Reintento (Retry)</label>
+                                    <input type="number" id="soaRetry">
+                                </div>
+                                <div class="form-group">
+                                    <label for="soaExpire">Tiempo de Expiración (Expire)</label>
+                                    <input type="number" id="soaExpire">
+                                </div>
+                                <div class="form-group col-span-three">
+                                    <label for="soaMinimum">TTL Mínimo Negativo (Minimum)</label>
+                                    <input type="number" id="soaMinimum">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DNS Records Table -->
+                    <div class="details-card table-card">
+                        <div class="card-header-actions">
+                            <div class="card-title">Registros DNS de la Zona</div>
+                            <button class="btn btn-success btn-sm" id="btnAddRecordRow">
+                                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                Añadir Registro
+                            </button>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="data-table" id="recordsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre (Subdominio)</th>
+                                        <th>TTL (Opcional)</th>
+                                        <th>Clase</th>
+                                        <th>Tipo</th>
+                                        <th>Valor (Destino)</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recordsTableBody">
+                                    <!-- Loaded dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="card-footer-actions">
+                            <span class="footer-note">* El número de serie (Serial) del SOA se incrementará automáticamente al guardar cambios exitosos.</span>
+                            <button class="btn btn-primary" id="btnSaveRecords">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                Guardar y Validar Cambios
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW: Options -->
+                <section id="view-options" class="content-view">
+                    <h2>Configuraciones de BIND9 (named.conf.options)</h2>
+                    <div class="options-container">
+                        <div class="details-card">
+                            <div class="card-title">Opciones del Servidor</div>
+                            
+                            <form id="optionsForm">
+                                <div class="form-group toggle-group">
+                                    <div class="toggle-info">
+                                        <span class="toggle-label">Permitir Consultas Recursivas (recursion)</span>
+                                        <span class="toggle-description">Permite al servidor DNS resolver consultas de dominios externos para clientes permitidos.</span>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="optRecursion" checked>
+                                        <span class="slider round"></span>
+                                    </label>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Servidores de Reenvío (Forwarders)</label>
+                                    <span class="field-description">Direcciones IP de servidores DNS externos (como 8.8.8.8 o 1.1.1.1) a los que reenviar consultas que este servidor no tenga localmente.</span>
+                                    
+                                    <div id="forwardersList" class="forwarders-list">
+                                        <!-- Inputs loaded dynamically -->
+                                    </div>
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" id="btnAddForwarder" style="margin-top: 10px;">
+                                        + Agregar IP
+                                    </button>
+                                </div>
+
+                                <div class="form-actions" style="margin-top: 30px;">
+                                    <button type="button" class="btn btn-primary" id="btnSaveOptions">
+                                        Guardar Opciones Globales
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW: File Editor -->
+                <section id="view-editor" class="content-view">
+                    <div class="view-header">
+                        <h2>Editor de Configuración Directa</h2>
+                        <div class="editor-file-selector">
+                            <label for="editorFileSelect">Archivo:</label>
+                            <select id="editorFileSelect">
+                                <option value="named.conf">named.conf</option>
+                                <option value="named.conf.local">named.conf.local</option>
+                                <option value="named.conf.options">named.conf.options</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="details-card editor-card">
+                        <div class="editor-container">
+                            <textarea id="rawConfigTextarea" spellcheck="false"></textarea>
+                        </div>
+                        <div class="card-footer-actions">
+                            <span class="editor-warning">⚠️ ATENCIÓN: Editar directamente la sintaxis de estos archivos puede romper el servidor DNS. Se ejecutará una validación antes de guardar.</span>
+                            <button class="btn btn-primary" id="btnSaveRawConfig">Guardar Archivo de Configuración</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW: Diagnostics -->
+                <section id="view-diagnostics" class="content-view">
+                    <h2>Pruebas y Diagnóstico de Configuración</h2>
+                    <p class="section-description">Utiliza las utilidades nativas de BIND9 para verificar la sintaxis de todos los archivos y asegurarse de que la configuración sea 100% válida.</p>
+
+                    <div class="diagnostics-grid">
+                        <div class="details-card">
+                            <div class="card-title">Verificador de Configuración (`named-checkconf`)</div>
+                            <p>Esta herramienta analiza la sintaxis del archivo principal `named.conf` y todos los archivos incluidos.</p>
+                            <button class="btn btn-primary" id="btnRunCheckconf" style="margin-top: 15px;">Ejecutar named-checkconf</button>
+                        </div>
+
+                        <div class="details-card console-card">
+                            <div class="card-title">Resultado de Consola</div>
+                            <div class="console-output" id="diagnosticsConsole">
+                                [Consola inactiva. Haz clic en "Ejecutar named-checkconf" para iniciar...]
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: Add Zone -->
+    <div class="modal" id="addZoneModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Crear Nueva Zona DNS</h3>
+                <span class="modal-close" id="btnCloseAddZoneModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="addZoneForm">
+                    <div class="form-group">
+                        <label for="newZoneName">Nombre de la Zona</label>
+                        <input type="text" id="newZoneName" placeholder="ejemplo: miempresa.com o 1.168.192.in-addr.arpa" required>
+                        <span class="field-description">Para zonas inversas IPv4, utiliza el formato: <i>[subred-invertida].in-addr.arpa</i> (ej: 1.168.192.in-addr.arpa)</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newZoneType">Tipo de Zona</label>
+                        <select id="newZoneType">
+                            <option value="master">Master (Primaria)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="newZoneIsReverse">
+                            ¿Es una Zona Inversa?
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btnCancelAddZone">Cancelar</button>
+                <button class="btn btn-primary" id="btnSubmitAddZone">Crear Zona</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

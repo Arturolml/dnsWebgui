@@ -1,0 +1,18 @@
+[Unit]
+Description=BIND9 WebGUI - DNS Administration Interface
+After=network.target named.service
+Wants=named.service
+
+[Service]
+Type=simple
+User=root
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=/home/dnsserverl/dnsWebgui
+ExecStart=/home/dnsserverl/dnsWebgui/test_venv/bin/python3 app.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
