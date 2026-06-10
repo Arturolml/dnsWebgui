@@ -6,7 +6,9 @@ const state = {
     activeZone: null,
     activeZoneData: null,
     mode: 'test',
-    statusInterval: null
+    statusInterval: null,
+    rawZoneMode: false,
+    importQueue: []
 };
 
 // DOM Elements
@@ -136,6 +138,7 @@ function switchView(viewName, params = {}) {
         loadRawConfigFile();
     } else if (state.currentView === 'diagnostics') {
         viewTitle.innerText = "Diagnósticos y Pruebas";
+        fetchLogs();
     }
 }
 
@@ -321,6 +324,181 @@ function initZones() {
             }
         });
     });
+
+    // Import Zone Modal controls
+    const importModal = document.getElementById('importZoneModal');
+    const btnOpenImport = document.getElementById('btnOpenImportZoneModal');
+    const btnCloseImport = document.getElementById('btnCloseImportZoneModal');
+    const btnCancelImport = document.getElementById('btnCancelImportZone');
+    const btnSubmitImport = document.getElementById('btnSubmitImportZone');
+    const importForm = document.getElementById('importZoneForm');
+    const importFile = document.getElementById('importZoneFile');
+    const importContent = document.getElementById('importZoneContent');
+    const importNameInput = document.getElementById('importZoneName');
+    const singleImportFields = document.getElementById('singleImportFields');
+    const importQueueContainer = document.getElementById('importQueueContainer');
+    const importQueueBody = document.getElementById('importQueueBody');
+    
+    btnOpenImport.addEventListener('click', () => {
+        importForm.reset();
+        singleImportFields.style.display = 'block';
+        importQueueContainer.style.display = 'none';
+        importQueueBody.innerHTML = '';
+        state.importQueue = [];
+        importModal.classList.add('active');
+    });
+    
+    const closeImportModal = () => {
+        importModal.classList.remove('active');
+        state.importQueue = [];
+    };
+    btnCloseImport.addEventListener('click', closeImportModal);
+    btnCancelImport.addEventListener('click', closeImportModal);
+    
+    // File upload logic (supports single or multiple)
+    importFile.addEventListener('change', (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        
+        if (files.length === 1) {
+            // Single file import mode
+            singleImportFields.style.display = 'block';
+            importQueueContainer.style.display = 'none';
+            importQueueBody.innerHTML = '';
+            state.importQueue = [];
+            
+            const file = files[0];
+            let filename = file.name;
+            if (filename.startsWith('db.')) filename = filename.substring(3);
+            if (filename.endsWith('.txt')) filename = filename.substring(0, filename.length - 4);
+            
+            if (!importNameInput.value.trim()) {
+                importNameInput.value = filename;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                importContent.value = evt.target.result;
+            };
+            reader.readAsText(file);
+        } else {
+            // Multiple file import mode
+            singleImportFields.style.display = 'none';
+            importQueueContainer.style.display = 'block';
+            importQueueBody.innerHTML = '';
+            state.importQueue = [];
+            
+            Array.from(files).forEach((file, index) => {
+                let filename = file.name;
+                if (filename.startsWith('db.')) filename = filename.substring(3);
+                if (filename.endsWith('.txt')) filename = filename.substring(0, filename.length - 4);
+                
+                const item = {
+                    file: file,
+                    suggestedName: filename,
+                    content: '',
+                    status: 'pending'
+                };
+                state.importQueue.push(item);
+                
+                const row = document.createElement('tr');
+                row.id = `queue-row-${index}`;
+                row.innerHTML = `
+                    <td style="padding: 8px; font-size: 0.9rem; color: var(--text-primary); border-bottom: 1px solid var(--border-color);">${escapeHtml(file.name)}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">
+                        <input type="text" class="queue-zone-name font-mono" value="${escapeHtml(filename)}" style="padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; background: var(--bg-dark); border: 1px solid var(--border-color); color: var(--text-primary); width: 90%;" data-index="${index}">
+                    </td>
+                    <td class="queue-status" style="padding: 8px; font-size: 0.85rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">Pendiente</td>
+                `;
+                importQueueBody.appendChild(row);
+                
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    item.content = evt.target.result;
+                };
+                reader.readAsText(file);
+            });
+        }
+    });
+    
+    // Import Submit
+    btnSubmitImport.addEventListener('click', async (e) => {
+        e.preventDefault();
+        
+        if (state.importQueue.length === 0) {
+            // Single file import flow
+            const name = importNameInput.value.trim();
+            const content = importContent.value;
+            
+            if (!name || !content) {
+                showAlert("El nombre de la zona y el contenido son requeridos", "error");
+                return;
+            }
+            
+            btnSubmitImport.disabled = true;
+            btnSubmitImport.innerText = "Importando...";
+            
+            const res = await apiCall('/api/zones/import', 'POST', { name, content });
+            
+            btnSubmitImport.disabled = false;
+            btnSubmitImport.innerText = "Importar Zona";
+            
+            if (res.success) {
+                showAlert(res.message, 'success', true);
+                closeImportModal();
+                loadZonesList();
+            } else {
+                showAlert(res.message, 'error');
+            }
+        } else {
+            // Multiple files import flow
+            btnSubmitImport.disabled = true;
+            btnSubmitImport.innerText = "Procesando...";
+            
+            let successCount = 0;
+            let totalCount = state.importQueue.length;
+            
+            for (let i = 0; i < totalCount; i++) {
+                const item = state.importQueue[i];
+                const row = document.getElementById(`queue-row-${i}`);
+                if (!row) continue;
+                
+                const zoneNameInput = row.querySelector('.queue-zone-name');
+                const statusCell = row.querySelector('.queue-status');
+                const name = zoneNameInput.value.trim();
+                
+                if (!name) {
+                    statusCell.innerHTML = `<span style="color: var(--color-red); font-weight: bold;">Nombre vacío</span>`;
+                    continue;
+                }
+                
+                statusCell.innerHTML = `<span style="color: var(--color-blue);"><span class="spinner" style="width: 10px; height: 10px; border-width: 1.5px; display: inline-block; margin-right: 5px; vertical-align: middle;"></span>Importando...</span>`;
+                
+                const res = await apiCall('/api/zones/import', 'POST', { name, content: item.content });
+                
+                if (res.success) {
+                    statusCell.innerHTML = `<span style="color: var(--color-green); font-weight: bold;">✓ Importado</span>`;
+                    successCount++;
+                } else {
+                    statusCell.innerHTML = `<span style="color: var(--color-red); font-weight: bold;" title="${escapeHtml(res.message)}">✗ Error</span>`;
+                }
+            }
+            
+            btnSubmitImport.disabled = false;
+            btnSubmitImport.innerText = "Importar Zona";
+            
+            if (successCount === totalCount) {
+                showAlert(`Todas las ${totalCount} zonas fueron importadas con éxito.`, 'success', true);
+                closeImportModal();
+            } else if (successCount > 0) {
+                showAlert(`Se importaron con éxito ${successCount} de ${totalCount} zonas. Revisa los errores en la lista.`, 'warning', true);
+            } else {
+                showAlert(`No se pudo importar ninguna de las ${totalCount} zonas. Revisa los errores en la lista.`, 'error');
+            }
+            
+            loadZonesList();
+        }
+    });
 }
 
 async function loadZonesList() {
@@ -411,10 +589,53 @@ function initRecords() {
     });
     
     document.getElementById('btnSaveRecords').addEventListener('click', saveRecordsChanges);
+
+    // Toggle Mode Event
+    document.getElementById('btnToggleZoneMode').addEventListener('click', () => {
+        state.rawZoneMode = !state.rawZoneMode;
+        const visual = document.getElementById('visualRecordsContainer');
+        const raw = document.getElementById('rawZoneContainer');
+        const btn = document.getElementById('btnToggleZoneMode');
+        
+        if (state.rawZoneMode) {
+            visual.style.display = 'none';
+            raw.style.display = 'block';
+            btn.innerText = 'Volver a Modo Visual';
+            btn.className = 'btn btn-secondary btn-sm';
+            loadRawZoneFile(state.activeZone);
+        } else {
+            visual.style.display = 'block';
+            raw.style.display = 'none';
+            btn.innerText = 'Editar Modo Texto';
+            btn.className = 'btn btn-info btn-sm';
+            loadZoneRecords(state.activeZone);
+        }
+    });
+
+    document.getElementById('btnCheckRawZone').addEventListener('click', checkRawZone);
+    document.getElementById('btnSaveRawZone').addEventListener('click', saveRawZone);
+    document.getElementById('btnHideZoneConsole').addEventListener('click', () => {
+        document.getElementById('zoneConsoleCard').style.display = 'none';
+    });
 }
 
 async function loadZoneRecords(zoneName) {
     state.activeZone = zoneName;
+    
+    // Reset view mode to visual
+    state.rawZoneMode = false;
+    document.getElementById('visualRecordsContainer').style.display = 'block';
+    document.getElementById('rawZoneContainer').style.display = 'none';
+    const toggleBtn = document.getElementById('btnToggleZoneMode');
+    if (toggleBtn) {
+        toggleBtn.innerText = 'Editar Modo Texto';
+        toggleBtn.className = 'btn btn-info btn-sm';
+    }
+    const consoleCard = document.getElementById('zoneConsoleCard');
+    if (consoleCard) {
+        consoleCard.style.display = 'none';
+    }
+
     document.getElementById('recordsTitle').innerText = `Gestionar Zona: ${zoneName}`;
     
     const body = document.getElementById('recordsTableBody');
@@ -450,6 +671,62 @@ async function loadZoneRecords(zoneName) {
         res.data.records.forEach(rec => {
             appendRecordRow(rec);
         });
+    }
+}
+
+async function loadRawZoneFile(zoneName) {
+    const textarea = document.getElementById('rawZoneTextarea');
+    textarea.value = "Cargando archivo de zona...";
+    const res = await apiCall(`/api/zones/raw?zone=${encodeURIComponent(zoneName)}`);
+    if (res.success) {
+        textarea.value = res.content;
+    } else {
+        textarea.value = `Error: ${res.message}`;
+    }
+}
+
+async function checkRawZone() {
+    const consoleCard = document.getElementById('zoneConsoleCard');
+    const consoleOutput = document.getElementById('zoneConsoleOutput');
+    const content = document.getElementById('rawZoneTextarea').value;
+    
+    consoleCard.style.display = 'block';
+    consoleOutput.innerHTML = `[Validando sintaxis del archivo de zona ${state.activeZone}...]\n`;
+    
+    const res = await apiCall('/api/zones/raw/validate', 'POST', {
+        zone: state.activeZone,
+        content: content
+    });
+    
+    if (res.success) {
+        consoleOutput.innerHTML = `<span style="color: var(--color-green); font-weight: bold;">[OK] La sintaxis de la zona es correcta.</span>\n\n${res.message}`;
+        showAlert("Sintaxis de la zona correcta. Listo para guardar.", 'success');
+    } else {
+        consoleOutput.innerHTML = `<span style="color: var(--color-red); font-weight: bold;">[ERROR] La validación de sintaxis falló:</span>\n\n${escapeHtml(res.message)}`;
+        showAlert("Error de sintaxis en el archivo de zona.", 'error');
+    }
+}
+
+async function saveRawZone() {
+    const content = document.getElementById('rawZoneTextarea').value;
+    
+    if (!confirm(`¿Estás seguro de que deseas guardar los cambios crudos en la zona ${state.activeZone}? Una sintaxis errónea puede interrumpir las consultas de DNS.`)) {
+        return;
+    }
+    
+    const res = await apiCall('/api/zones/raw', 'POST', {
+        zone: state.activeZone,
+        content: content
+    });
+    
+    if (res.success) {
+        showAlert("Archivo de zona guardado y validado con éxito. Recuerda recargar la configuración.", 'success');
+        document.getElementById('zoneConsoleCard').style.display = 'none';
+        loadZoneRecords(state.activeZone);
+    } else {
+        document.getElementById('zoneConsoleCard').style.display = 'block';
+        document.getElementById('zoneConsoleOutput').innerHTML = `<span style="color: var(--color-red); font-weight: bold;">[ERROR] Fallo al guardar:</span>\n\n${escapeHtml(res.message)}`;
+        showAlert("No se pudo guardar: error de validación.", 'error');
     }
 }
 
@@ -571,6 +848,47 @@ function initOptions() {
     });
     
     document.getElementById('btnSaveOptions').addEventListener('click', saveGlobalOptionsChanges);
+
+    const cpForm = document.getElementById('changePasswordForm');
+    if (cpForm) {
+        cpForm.addEventListener('submit', changePassword);
+    }
+}
+
+async function changePassword(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('pwdUsername').value;
+    const oldPassword = document.getElementById('pwdOld').value;
+    const newPassword = document.getElementById('pwdNew').value;
+    
+    if (!username || !oldPassword || !newPassword) {
+        showAlert("Por favor completa todos los campos", "error");
+        return;
+    }
+    
+    const btn = document.getElementById('btnChangePassword');
+    btn.disabled = true;
+    btn.innerText = "Actualizando...";
+    
+    const res = await apiCall('/api/users/change_password', 'POST', {
+        username,
+        old_password: oldPassword,
+        new_password: newPassword
+    });
+    
+    btn.disabled = false;
+    btn.innerText = "Actualizar Contraseña";
+    
+    if (res.success) {
+        showAlert(res.message, "success");
+        document.getElementById('changePasswordForm').reset();
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
+    } else {
+        showAlert(res.message || "Error al actualizar la contraseña", "error");
+    }
 }
 
 function appendForwarderRow(ip) {
@@ -645,9 +963,16 @@ async function saveGlobalOptionsChanges() {
 // --- Editor Logic ---
 function initEditor() {
     const selector = document.getElementById('editorFileSelect');
-    selector.addEventListener('change', loadRawConfigFile);
+    selector.addEventListener('change', () => {
+        document.getElementById('editorConsoleCard').style.display = 'none';
+        loadRawConfigFile();
+    });
     
     document.getElementById('btnSaveRawConfig').addEventListener('click', saveRawConfigFile);
+    document.getElementById('btnCheckRawConfig').addEventListener('click', checkRawConfigFile);
+    document.getElementById('btnHideEditorConsole').addEventListener('click', () => {
+        document.getElementById('editorConsoleCard').style.display = 'none';
+    });
 }
 
 async function loadRawConfigFile() {
@@ -686,9 +1011,39 @@ async function saveRawConfigFile() {
     }
 }
 
+async function checkRawConfigFile() {
+    const file = document.getElementById('editorFileSelect').value;
+    const content = document.getElementById('rawConfigTextarea').value;
+    
+    const btn = document.getElementById('btnCheckRawConfig');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> Validando...`;
+    
+    const consoleCard = document.getElementById('editorConsoleCard');
+    const consoleOutput = document.getElementById('editorConsoleOutput');
+    
+    consoleCard.style.display = 'block';
+    consoleOutput.innerHTML = `<span style="color: var(--text-secondary);">Validando sintaxis de ${escapeHtml(file)}...</span>`;
+    
+    const res = await apiCall('/api/raw_config/validate', 'POST', { file, content });
+    
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    
+    if (res.success) {
+        consoleOutput.innerHTML = `<span style="color: var(--color-green); font-weight: bold;">[OK] Validación exitosa.</span>\n\n${escapeHtml(res.message)}`;
+        showAlert("La configuración es válida.", 'success');
+    } else {
+        consoleOutput.innerHTML = `<span style="color: var(--color-red); font-weight: bold;">[ERROR] La validación falló:</span>\n\n${escapeHtml(res.message)}`;
+        showAlert("Error de sintaxis detectado.", 'error');
+    }
+}
+
 // --- Diagnostics Logic ---
 function initDiagnostics() {
     document.getElementById('btnRunCheckconf').addEventListener('click', runCheckconf);
+    document.getElementById('btnRefreshLogs').addEventListener('click', fetchLogs);
 }
 
 async function runCheckconf() {
@@ -703,5 +1058,20 @@ async function runCheckconf() {
     } else {
         consoleDiv.innerHTML = `<span style="color: var(--color-red); font-weight: bold;">[ERROR] La validación de sintaxis FALLÓ.</span>\n\n`;
         consoleDiv.innerHTML += `${escapeHtml(res.output)}`;
+    }
+}
+
+async function fetchLogs() {
+    const logsConsole = document.getElementById('logsConsole');
+    if (!logsConsole) return;
+    
+    logsConsole.innerHTML = `<span style="color: var(--text-secondary);">Cargando logs del servicio...</span>`;
+    
+    const res = await apiCall('/api/logs?lines=100');
+    if (res.success) {
+        logsConsole.innerHTML = escapeHtml(res.logs) || '<span style="color: var(--text-secondary);">[No hay registros de log disponibles]</span>';
+        logsConsole.scrollTop = logsConsole.scrollHeight;
+    } else {
+        logsConsole.innerHTML = `<span style="color: var(--color-red); font-weight: bold;">Error al obtener logs:</span>\n\n${escapeHtml(res.message)}`;
     }
 }

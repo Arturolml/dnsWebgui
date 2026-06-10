@@ -536,6 +536,40 @@ class BindManager:
                 os.remove(temp_path)
             return False, f"Error guardando el archivo final: {str(e)}"
 
+    def validate_raw_config(self, file_type, content):
+        """Validate raw file content without writing to the main file"""
+        path_map = {
+            'named.conf': self.named_conf_path,
+            'named.conf.local': self.named_conf_local_path,
+            'named.conf.options': self.named_conf_options_path
+        }
+        
+        file_path = path_map.get(file_type)
+        if not file_path:
+            return False, "Tipo de archivo desconocido"
+            
+        temp_path = file_path + ".check.tmp"
+        try:
+            with open(temp_path, 'w') as f:
+                f.write(content)
+        except Exception as e:
+            return False, f"Error escribiendo archivo temporal de validación: {str(e)}"
+            
+        # Validate syntax
+        success, output = self.validate_config_file(temp_path)
+        
+        # Cleanup
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+                
+        if success:
+            return True, "La sintaxis del archivo es totalmente válida."
+        else:
+            return False, output
+
     def rename_zone(self, old_name, new_name):
         old_name = old_name.strip().lower()
         new_name = new_name.strip().lower()
@@ -664,3 +698,159 @@ class BindManager:
             return False, f"Fallo al ejecutar '{action}': {res.stderr or res.stdout}"
         except Exception as e:
             return False, f"Excepción al controlar servicio: {str(e)}"
+
+    def get_service_logs(self, lines=100):
+        """Get logs from BIND9 service using journalctl or syslog fallback"""
+        try:
+            is_root = os.getuid() == 0
+            cmd = ['journalctl', '-n', str(lines), '-u', 'named', '--no-pager']
+            if not is_root:
+                cmd = ['sudo', '-n', 'journalctl', '-n', str(lines), '-u', 'named', '--no-pager']
+            
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if res.returncode == 0:
+                return res.stdout
+            
+            err_msg = res.stderr or res.stdout or ""
+            if "password is required" in err_msg or "a password is required" in err_msg:
+                # Fallback to reading system files if possible, or report permission denied
+                pass
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            return f"Error al ejecutar journalctl: {str(e)}"
+            
+        # Fallback to syslog or messages files
+        for syslog_path in ['/var/log/syslog', '/var/log/messages']:
+            if os.path.exists(syslog_path):
+                try:
+                    with open(syslog_path, 'r') as f:
+                        lines_content = f.readlines()
+                    named_lines = [line for line in lines_content if 'named[' in line]
+                    return "".join(named_lines[-lines:])
+                except Exception as e:
+                    return f"Error leyendo syslog ({syslog_path}): {str(e)}"
+                    
+        return "No se pudieron obtener los logs del servicio (permisos insuficientes para journalctl/syslog)."
+
+    def get_raw_zone_file(self, zone_name):
+        """Get raw text content of a zone database file"""
+        zones = self.get_zones()
+        zone = next((z for z in zones if z['name'] == zone_name), None)
+        if not zone:
+            return None, "La zona no existe"
+            
+        file_path = zone['file_path']
+        if not os.path.exists(file_path):
+            return None, f"El archivo de base de datos de la zona no existe en: {file_path}"
+            
+        try:
+            with open(file_path, 'r') as f:
+                return f.read(), None
+        except Exception as e:
+            return None, f"Error leyendo archivo de zona: {str(e)}"
+
+    def save_raw_zone_file(self, zone_name, content):
+        """Save raw text content to zone file after validation"""
+        zones = self.get_zones()
+        zone = next((z for z in zones if z['name'] == zone_name), None)
+        if not zone:
+            return False, "La zona no existe"
+            
+        file_path = zone['file_path']
+        temp_path = file_path + ".tmp"
+        
+        try:
+            with open(temp_path, 'w') as f:
+                f.write(content)
+        except Exception as e:
+            return False, f"Error escribiendo archivo temporal de zona: {str(e)}"
+            
+        # Validate syntax
+        success, output = self.validate_zone_file(zone_name, temp_path)
+        if not success:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            return False, f"Validación de sintaxis fallida:\n{output}"
+            
+        try:
+            shutil.move(temp_path, file_path)
+            return True, "Archivo de zona guardado y validado con éxito"
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            return False, f"Error al guardar el archivo final de zona: {str(e)}"
+
+    def import_zone(self, zone_name, content):
+        """Import an existing zone from file content, validating it and adding it to BIND9 config"""
+        zone_name = zone_name.strip().lower()
+        if not zone_name:
+            return False, "El nombre de la zona no puede estar vacío"
+            
+        zones = self.get_zones()
+        if any(z['name'] == zone_name for z in zones):
+            return False, f"La zona '{zone_name}' ya está configurada en este servidor"
+            
+        file_path = os.path.join(self.config_dir, f"db.{zone_name}")
+        temp_path = file_path + ".import.tmp"
+        
+        try:
+            with open(temp_path, 'w') as f:
+                f.write(content)
+        except Exception as e:
+            return False, f"Error de escritura en archivo temporal: {str(e)}"
+            
+        success, output = self.validate_zone_file(zone_name, temp_path)
+        if not success:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            return False, f"Validación de sintaxis fallida para la zona '{zone_name}':\n{output}"
+            
+        try:
+            shutil.move(temp_path, file_path)
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            return False, f"Error moviendo archivo de zona a destino: {str(e)}"
+            
+        local_conf_path = os.path.join(self.config_dir, 'named.conf.local')
+        backup_conf_path = local_conf_path + ".bak"
+        
+        try:
+            if os.path.exists(local_conf_path):
+                shutil.copy2(local_conf_path, backup_conf_path)
+        except Exception as e:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return False, f"No se pudo respaldar named.conf.local: {str(e)}"
+            
+        zone_declaration = (
+            f'\nzone "{zone_name}" {{\n'
+            f'    type master;\n'
+            f'    file "{file_path}";\n'
+            f'}};\n'
+        )
+        
+        try:
+            with open(local_conf_path, 'a') as f:
+                f.write(zone_declaration)
+        except Exception as e:
+            if os.path.exists(backup_conf_path):
+                shutil.move(backup_conf_path, local_conf_path)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return False, f"Error escribiendo en named.conf.local: {str(e)}"
+            
+        success_all, output_all = self.validate_all()
+        if not success_all:
+            if os.path.exists(backup_conf_path):
+                shutil.move(backup_conf_path, local_conf_path)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return False, f"La configuración global de BIND9 falló tras agregar la zona:\n{output_all}"
+            
+        if os.path.exists(backup_conf_path):
+            os.remove(backup_conf_path)
+            
+        return True, f"Zona '{zone_name}' importada y validada con éxito"
+

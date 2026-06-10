@@ -179,10 +179,16 @@
                 <section id="view-zones" class="content-view">
                     <div class="view-header">
                         <h2>Zonas DNS Configuradas</h2>
-                        <button class="btn btn-primary" id="btnOpenAddZoneModal">
-                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                            Nueva Zona
-                        </button>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-secondary" id="btnOpenImportZoneModal">
+                                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                Importar Zona
+                            </button>
+                            <button class="btn btn-primary" id="btnOpenAddZoneModal">
+                                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                Nueva Zona
+                            </button>
+                        </div>
                     </div>
 
                     <div class="search-bar-container">
@@ -216,95 +222,127 @@
                         </button>
                         <h2 id="recordsTitle">Gestionar Zona: example.com</h2>
                         <span class="badge font-mono" id="recordsFilePath">db.example.com</span>
+                        <button class="btn btn-info btn-sm" id="btnToggleZoneMode" style="margin-left: auto;">Editar Modo Texto</button>
                     </div>
 
-                    <!-- Zone Config & SOA Grid -->
-                    <div class="zone-soa-grid">
-                        <!-- Global parameters -->
-                        <div class="details-card">
-                            <div class="card-title">Parámetros Globales de la Zona</div>
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label for="soaDefaultTtl">Default TTL (segundos)</label>
-                                    <input type="text" id="soaDefaultTtl" value="604800">
+                    <div id="visualRecordsContainer">
+                        <!-- Zone Config & SOA Grid -->
+                        <div class="zone-soa-grid">
+                            <!-- Global parameters -->
+                            <div class="details-card">
+                                <div class="card-title">Parámetros Globales de la Zona</div>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="soaDefaultTtl">Default TTL (segundos)</label>
+                                        <input type="text" id="soaDefaultTtl" value="604800">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="soaName">Nombre (Apex / @)</label>
+                                        <input type="text" id="soaName" value="@" readonly>
+                                    </div>
                                 </div>
-                                <div class="form-group">
-                                    <label for="soaName">Nombre (Apex / @)</label>
-                                    <input type="text" id="soaName" value="@" readonly>
+                            </div>
+
+                            <!-- SOA Record detail -->
+                            <div class="details-card">
+                                <div class="card-title">Registro SOA (Start of Authority)</div>
+                                <div class="form-grid-three">
+                                    <div class="form-group">
+                                        <label for="soaMname">Servidor Primario (MName)</label>
+                                        <input type="text" id="soaMname">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="soaRname">Correo Administrador (RName)</label>
+                                        <input type="text" id="soaRname">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="soaSerial">Número de Serie (Serial)</label>
+                                        <input type="number" id="soaSerial" readonly>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="soaRefresh">Frecuencia de Refresco (Refresh)</label>
+                                        <input type="number" id="soaRefresh">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="soaRetry">Tiempo de Reintento (Retry)</label>
+                                        <input type="number" id="soaRetry">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="soaExpire">Tiempo de Expiración (Expire)</label>
+                                        <input type="number" id="soaExpire">
+                                    </div>
+                                    <div class="form-group col-span-three">
+                                        <label for="soaMinimum">TTL Mínimo Negativo (Minimum)</label>
+                                        <input type="number" id="soaMinimum">
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- SOA Record detail -->
-                        <div class="details-card">
-                            <div class="card-title">Registro SOA (Start of Authority)</div>
-                            <div class="form-grid-three">
-                                <div class="form-group">
-                                    <label for="soaMname">Servidor Primario (MName)</label>
-                                    <input type="text" id="soaMname">
-                                </div>
-                                <div class="form-group">
-                                    <label for="soaRname">Correo Administrador (RName)</label>
-                                    <input type="text" id="soaRname">
-                                </div>
-                                <div class="form-group">
-                                    <label for="soaSerial">Número de Serie (Serial)</label>
-                                    <input type="number" id="soaSerial" readonly>
-                                </div>
-                                <div class="form-group">
-                                    <label for="soaRefresh">Frecuencia de Refresco (Refresh)</label>
-                                    <input type="number" id="soaRefresh">
-                                </div>
-                                <div class="form-group">
-                                    <label for="soaRetry">Tiempo de Reintento (Retry)</label>
-                                    <input type="number" id="soaRetry">
-                                </div>
-                                <div class="form-group">
-                                    <label for="soaExpire">Tiempo de Expiración (Expire)</label>
-                                    <input type="number" id="soaExpire">
-                                </div>
-                                <div class="form-group col-span-three">
-                                    <label for="soaMinimum">TTL Mínimo Negativo (Minimum)</label>
-                                    <input type="number" id="soaMinimum">
-                                </div>
+                        <!-- DNS Records Table -->
+                        <div class="details-card table-card">
+                            <div class="card-header-actions">
+                                <div class="card-title">Registros DNS de la Zona</div>
+                                <button class="btn btn-success btn-sm" id="btnAddRecordRow">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                    Añadir Registro
+                                </button>
+                            </div>
+
+                            <div class="table-container">
+                                <table class="data-table" id="recordsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Nombre (Subdominio)</th>
+                                            <th>TTL (Opcional)</th>
+                                            <th>Clase</th>
+                                            <th>Tipo</th>
+                                            <th>Valor (Destino)</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recordsTableBody">
+                                        <!-- Loaded dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="card-footer-actions">
+                                <span class="footer-note">* El número de serie (Serial) del SOA se incrementará automáticamente al guardar cambios exitosos.</span>
+                                <button class="btn btn-primary" id="btnSaveRecords">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    Guardar y Validar Cambios
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- DNS Records Table -->
-                    <div class="details-card table-card">
-                        <div class="card-header-actions">
-                            <div class="card-title">Registros DNS de la Zona</div>
-                            <button class="btn btn-success btn-sm" id="btnAddRecordRow">
-                                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                                Añadir Registro
-                            </button>
+                    <div id="rawZoneContainer" style="display: none;">
+                        <div class="details-card editor-card">
+                            <div class="editor-container">
+                                <textarea id="rawZoneTextarea" spellcheck="false" style="font-family: 'Fira Code', monospace; min-height: 400px;"></textarea>
+                            </div>
+                            <div class="card-footer-actions">
+                                <span class="editor-warning">⚠️ ATENCIÓN: Editar directamente la sintaxis del archivo de zona puede romper la resolución del dominio. Se ejecutará una validación.</span>
+                                <div class="editor-buttons" style="display: flex; gap: 12px;">
+                                    <button class="btn btn-secondary" id="btnCheckRawZone">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                        </svg>
+                                        Chequear Sintaxis
+                                    </button>
+                                    <button class="btn btn-primary" id="btnSaveRawZone">Guardar Archivo de Zona</button>
+                                </div>
+                            </div>
                         </div>
-
-                        <div class="table-container">
-                            <table class="data-table" id="recordsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Nombre (Subdominio)</th>
-                                        <th>TTL (Opcional)</th>
-                                        <th>Clase</th>
-                                        <th>Tipo</th>
-                                        <th>Valor (Destino)</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recordsTableBody">
-                                    <!-- Loaded dynamically -->
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="card-footer-actions">
-                            <span class="footer-note">* El número de serie (Serial) del SOA se incrementará automáticamente al guardar cambios exitosos.</span>
-                            <button class="btn btn-primary" id="btnSaveRecords">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                Guardar y Validar Cambios
-                            </button>
+                        <div class="details-card console-card" id="zoneConsoleCard" style="display: none; margin-top: 20px;">
+                            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                                <span>Resultado del Chequeo de Zona</span>
+                                <button type="button" class="btn btn-sm btn-secondary" id="btnHideZoneConsole" style="padding: 4px 10px;">Cerrar</button>
+                            </div>
+                            <div class="console-output" id="zoneConsoleOutput"></div>
                         </div>
                     </div>
                 </section>
@@ -348,6 +386,34 @@
                                 </div>
                             </form>
                         </div>
+
+                        <div class="details-card" style="margin-top: 24px;">
+                            <div class="card-title">Cambiar Contraseña de Administrador</div>
+                            <form id="changePasswordForm">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="pwdUsername">Usuario</label>
+                                        <select id="pwdUsername">
+                                            <option value="admindns">admindns</option>
+                                            <option value="adminbind">adminbind</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="pwdOld">Contraseña Actual</label>
+                                        <input type="password" id="pwdOld" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="pwdNew">Nueva Contraseña</label>
+                                        <input type="password" id="pwdNew" required>
+                                    </div>
+                                </div>
+                                <div class="form-actions" style="margin-top: 24px;">
+                                    <button type="submit" class="btn btn-primary" id="btnChangePassword">
+                                        Actualizar Contraseña
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </section>
 
@@ -371,8 +437,26 @@
                         </div>
                         <div class="card-footer-actions">
                             <span class="editor-warning">⚠️ ATENCIÓN: Editar directamente la sintaxis de estos archivos puede romper el servidor DNS. Se ejecutará una validación antes de guardar.</span>
-                            <button class="btn btn-primary" id="btnSaveRawConfig">Guardar Archivo de Configuración</button>
+                            <div class="editor-buttons" style="display: flex; gap: 12px;">
+                                <button class="btn btn-secondary" id="btnCheckRawConfig">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    </svg>
+                                    Chequear Configuración
+                                </button>
+                                <button class="btn btn-primary" id="btnSaveRawConfig">Guardar Archivo de Configuración</button>
+                            </div>
                         </div>
+                    </div>
+
+                    <div class="details-card console-card" id="editorConsoleCard" style="display: none; margin-top: 20px;">
+                        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                            <span>Resultado del Chequeo de Configuración</span>
+                            <button type="button" class="btn btn-sm btn-secondary" id="btnHideEditorConsole" style="padding: 4px 10px;">Cerrar</button>
+                        </div>
+                        <div class="console-output" id="editorConsoleOutput"></div>
                     </div>
                 </section>
 
@@ -393,6 +477,16 @@
                             <div class="console-output" id="diagnosticsConsole">
                                 [Consola inactiva. Haz clic en "Ejecutar named-checkconf" para iniciar...]
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="details-card console-card" style="margin-top: 24px;">
+                        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                            <span>Logs del Servidor BIND9 (named)</span>
+                            <button class="btn btn-sm btn-secondary" id="btnRefreshLogs" style="padding: 4px 10px;">Actualizar Logs</button>
+                        </div>
+                        <div class="console-output" id="logsConsole" style="min-height: 250px; max-height: 400px; overflow-y: auto;">
+                            [Haz clic en "Actualizar Logs" para ver los logs del servicio...]
                         </div>
                     </div>
                 </section>
@@ -433,6 +527,59 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="btnCancelAddZone">Cancelar</button>
                 <button class="btn btn-primary" id="btnSubmitAddZone">Crear Zona</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Import Zone -->
+    <div class="modal" id="importZoneModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>Importar Zona DNS desde Archivo</h3>
+                <span class="modal-close" id="btnCloseImportZoneModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="importZoneForm">
+                    <div class="form-group">
+                        <label for="importZoneFile">Seleccionar Archivo(s) de Zona</label>
+                        <input type="file" id="importZoneFile" accept=".db,.txt,db.*" multiple>
+                        <span class="field-description">Selecciona uno o más archivos de zona. Si seleccionas varios, se activará la importación masiva.</span>
+                    </div>
+
+                    <div id="singleImportFields">
+                        <div class="form-group">
+                            <label for="importZoneName">Nombre de la Zona</label>
+                            <input type="text" id="importZoneName" placeholder="ejemplo: miempresa.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="importZoneContent">Contenido del Archivo de Zona (Formato BIND9)</label>
+                            <textarea id="importZoneContent" rows="12" class="font-mono" placeholder="Pegar contenido del archivo de zona aquí... Debe incluir registros SOA, NS, etc." style="resize: vertical; min-height: 200px;"></textarea>
+                        </div>
+                    </div>
+
+                    <div id="importQueueContainer" style="display: none; margin-top: 15px;">
+                        <label style="font-weight: 600; margin-bottom: 8px; display: block; color: var(--text-primary);">Cola de Importación Masiva</label>
+                        <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background-color: #0d121f; padding: 10px;">
+                            <table class="data-table" style="margin: 0; width: 100%; border-collapse: collapse; background: transparent;">
+                                <thead>
+                                    <tr>
+                                        <th style="padding: 8px; text-align: left; font-size: 0.85rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-color);">Archivo</th>
+                                        <th style="padding: 8px; text-align: left; font-size: 0.85rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); width: 45%;">Nombre de Zona</th>
+                                        <th style="padding: 8px; text-align: left; font-size: 0.85rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); width: 30%;">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="importQueueBody">
+                                    <!-- Fila dinámica por cada archivo cargado -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btnCancelImportZone">Cancelar</button>
+                <button class="btn btn-primary" id="btnSubmitImportZone">Importar Zona</button>
             </div>
         </div>
     </div>

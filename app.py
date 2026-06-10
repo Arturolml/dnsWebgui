@@ -18,6 +18,28 @@ print(f"Carpeta de configuración: {config_dir}")
 
 bind_mgr = BindManager(config_dir)
 
+def load_users():
+    users_file = os.path.join(config_dir, 'webgui_users.json')
+    if os.path.exists(users_file):
+        try:
+            with open(users_file, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        'admindns': 'ipkQoRm5X1U4mT',
+        'adminbind': 'ipkQoRm5X1U4mT'
+    }
+
+def save_users(users_dict):
+    users_file = os.path.join(config_dir, 'webgui_users.json')
+    try:
+        with open(users_file, 'w') as f:
+            json.dump(users_dict, f, indent=4)
+        return True
+    except Exception:
+        return False
+
 def get_ram_usage():
     try:
         with open('/proc/meminfo', 'r') as f:
@@ -71,8 +93,12 @@ class BIND9WebGUIRequestHandler(BaseHTTPRequestHandler):
                 self.send_unauthorized()
                 return False
             decoded = base64.b64decode(encoded_credentials).decode('utf-8')
+            if ':' not in decoded:
+                self.send_unauthorized()
+                return False
             username, password = decoded.split(':', 1)
-            if username in ['admindns', 'adminbind'] and password == 'ipkQoRm5X1U4mT':
+            users = load_users()
+            if username in users and users[username] == password:
                 return True
         except Exception:
             pass
@@ -262,6 +288,27 @@ class BIND9WebGUIRequestHandler(BaseHTTPRequestHandler):
             success, output = bind_mgr.validate_all()
             self.send_json(200, {'success': success, 'output': output})
             
+        elif path == '/api/logs':
+            lines = 100
+            if 'lines' in query:
+                try:
+                    lines = int(query['lines'][0])
+                except ValueError:
+                    pass
+            logs = bind_mgr.get_service_logs(lines)
+            self.send_json(200, {'success': True, 'logs': logs})
+            
+        elif path == '/api/zones/raw':
+            zone_name = query.get('zone', [None])[0]
+            if not zone_name:
+                self.send_json(400, {'success': False, 'message': 'Parámetro "zone" es requerido'})
+                return
+            content, err = bind_mgr.get_raw_zone_file(zone_name)
+            if err:
+                self.send_json(400, {'success': False, 'message': err})
+            else:
+                self.send_json(200, {'success': True, 'content': content})
+            
         else:
             self.send_json(404, {'success': False, 'message': 'Endpoint de API GET no encontrado'})
 
@@ -318,6 +365,74 @@ class BIND9WebGUIRequestHandler(BaseHTTPRequestHandler):
             success, msg = bind_mgr.save_raw_config(file_type, content)
             self.send_json(200 if success else 400, {'success': success, 'message': msg})
             
+        elif path == '/api/raw_config/validate':
+            file_type = body.get('file')
+            content = body.get('content')
+            if not file_type or content is None:
+                self.send_json(400, {'success': False, 'message': 'Archivo o contenido vacío'})
+                return
+            success, msg = bind_mgr.validate_raw_config(file_type, content)
+            self.send_json(200, {'success': success, 'message': msg})
+            
+        elif path == '/api/zones/raw':
+            zone_name = body.get('zone')
+            content = body.get('content')
+            if not zone_name or content is None:
+                self.send_json(400, {'success': False, 'message': 'Zona o contenido vacío'})
+                return
+            success, msg = bind_mgr.save_raw_zone_file(zone_name, content)
+            self.send_json(200 if success else 400, {'success': success, 'message': msg})
+            
+        elif path == '/api/zones/raw/validate':
+            zone_name = body.get('zone')
+            content = body.get('content')
+            if not zone_name or content is None:
+                self.send_json(400, {'success': False, 'message': 'Zona o contenido vacío'})
+                return
+            temp_path = os.path.join(bind_mgr.config_dir, f"{zone_name}.check.tmp")
+            try:
+                with open(temp_path, 'w') as f:
+                    f.write(content)
+            except Exception as e:
+                self.send_json(400, {'success': False, 'message': f"Error escribiendo archivo temporal: {str(e)}"})
+                return
+            success, output = bind_mgr.validate_zone_file(zone_name, temp_path)
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
+            self.send_json(200, {'success': success, 'message': "La sintaxis es totalmente válida." if success else output})
+            
+        elif path == '/api/users/change_password':
+            username = body.get('username')
+            old_password = body.get('old_password')
+            new_password = body.get('new_password')
+            
+            if not username or not old_password or not new_password:
+                self.send_json(400, {'success': False, 'message': 'Datos incompletos'})
+                return
+                
+            users = load_users()
+            if username not in users or users[username] != old_password:
+                self.send_json(400, {'success': False, 'message': 'Usuario o contraseña actual incorrecta'})
+                return
+                
+            users[username] = new_password
+            if save_users(users):
+                self.send_json(200, {'success': True, 'message': 'Contraseña cambiada con éxito. Por favor vuelve a iniciar sesión.'})
+            else:
+                self.send_json(500, {'success': False, 'message': 'No se pudo guardar la nueva contraseña'})
+            
+        elif path == '/api/zones/import':
+            name = body.get('name')
+            content = body.get('content')
+            if not name or content is None:
+                self.send_json(400, {'success': False, 'message': 'Nombre de la zona o contenido vacío'})
+                return
+            success, msg = bind_mgr.import_zone(name, content)
+            self.send_json(200 if success else 400, {'success': success, 'message': msg})
+            
         else:
             self.send_json(404, {'success': False, 'message': 'Endpoint de API POST no encontrado'})
 
@@ -332,4 +447,5 @@ def run_server(port=8080):
         httpd.server_close()
 
 if __name__ == '__main__':
-    run_server()
+    port = int(os.environ.get('PORT', 8080))
+    run_server(port)
